@@ -2,8 +2,10 @@
 CLI interface for qrcode-generator.
 """
 
-import click
 from pathlib import Path
+
+import click
+from qrcode.exceptions import DataOverflowError
 
 from .generator import generate_qr, generate_wifi_qr, batch_generate
 
@@ -22,7 +24,10 @@ def main():
 @click.option("--border", type=int, default=4, help="QR code border size")
 def generate(data, output, box_size, border):
     """Generate a QR code from text or URL."""
-    generate_qr(data, output, box_size=box_size, border=border)
+    try:
+        generate_qr(data, output, box_size=box_size, border=border)
+    except (OSError, ValueError, DataOverflowError) as exc:
+        raise click.ClickException(str(exc)) from exc
     click.echo(f"✅ QR code saved to: {output}")
 
 
@@ -33,7 +38,10 @@ def generate(data, output, box_size, border):
 @click.option("-o", "--output", default="wifi_qr.png", help="Output image file")
 def wifi(ssid, password, security, output):
     """Generate a WiFi QR code."""
-    generate_wifi_qr(ssid, password, security=security, output_path=output)
+    try:
+        generate_wifi_qr(ssid, password, security=security, output_path=output)
+    except (OSError, ValueError, DataOverflowError) as exc:
+        raise click.ClickException(str(exc)) from exc
     click.echo(f"✅ WiFi QR code saved to: {output}")
 
 
@@ -42,8 +50,11 @@ def wifi(ssid, password, security, output):
 @click.option("-o", "--output-dir", default="qrcodes", help="Output directory")
 def batch(file, output_dir):
     """Batch generate QR codes from a text file."""
-    data_list = Path(file).read_text(encoding="utf-8").strip().split("\n")
-    generated = batch_generate(data_list, output_dir)
+    try:
+        data_list = Path(file).read_text(encoding="utf-8").strip().split("\n")
+        generated = batch_generate(data_list, output_dir)
+    except (OSError, ValueError, DataOverflowError) as exc:
+        raise click.ClickException(str(exc)) from exc
     click.echo(f"✅ Generated {len(generated)} QR codes in {output_dir}/")
 
 

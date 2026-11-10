@@ -38,6 +38,9 @@ qrcode-generator = "qrcode_generator.cli:main"
 dev = [
     "pytest>=7.0.0",
 ]
+decode-test = [
+    "zxing-cpp>=2.2.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/Master-626/qrcode-generator"
