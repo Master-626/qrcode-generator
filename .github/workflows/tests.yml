@@ -1,0 +1,74 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-15-intel]
+        python: ['3.8', '3.13']
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install source and test dependencies
+        run: python -m pip install -e ".[dev,decode-test]" build
+      - name: Require image decoder
+        run: python -c "import zxingcpp"
+      - name: Test source
+        run: python -m pytest -q -rs --junitxml=source-tests.xml
+      - name: Fetch verified ZXing Java parser
+        run: python validation/fetch_zxing.py
+      - name: Check source image/parser round trips
+        run: python validation/check_roundtrips.py --source src --output source-roundtrips.json
+      - name: Build wheel and sdist
+        run: python -m build
+      - name: Install built wheel
+        run: python -c "import glob, subprocess, sys; subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--force-reinstall', '--no-deps', glob.glob('dist/*.whl')[0]])"
+      - name: Verify wheel import
+        run: python -c "import pathlib, qrcode_generator; p = pathlib.Path(qrcode_generator.__file__).resolve(); print(p); assert pathlib.Path('src').resolve() not in p.parents"
+      - name: Test installed wheel
+        run: python -m pytest -q -rs --junitxml=wheel-tests.xml
+      - name: Check installed entry points and parser round trips
+        run: python validation/check_roundtrips.py --aliases --output wheel-roundtrips.json
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            *-tests.xml
+            *-roundtrips.json
+          if-no-files-found: warn
+
+  lint:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install ruff
+      - name: Check changed Python files
+        run: ruff check --isolated --target-version py38 --select E,F src/qrcode_generator/cli.py src/qrcode_generator/generator.py tests/test_output_safety.py tests/test_wifi_payload.py validation
+      - name: Check formatting
+        run: ruff format --check --isolated --target-version py38 src/qrcode_generator/cli.py src/qrcode_generator/generator.py tests/test_output_safety.py tests/test_wifi_payload.py validation
