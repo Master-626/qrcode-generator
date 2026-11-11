@@ -1,4 +1,3 @@
-import pytest
 from qrcode_generator.generator import generate_qr, generate_wifi_qr
 
 

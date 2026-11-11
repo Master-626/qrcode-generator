@@ -6,15 +6,15 @@ import importlib.metadata
 import importlib.util
 import json
 import os
-from pathlib import Path
 import platform
 import shutil
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
-from PIL import Image
 import zxingcpp
+from PIL import Image
 
 
 def main():
