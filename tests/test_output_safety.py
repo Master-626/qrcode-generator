@@ -238,6 +238,69 @@ def test_cli_missing_input_is_readable_error(tmp_path):
     assert "Error:" in result.output
 
 
+@pytest.mark.parametrize("kind", ["file", "symlink-file", "dangling"])
+def test_output_directory_entry_is_not_replaced(tmp_path, kind):
+    if kind == "file":
+        directory = tmp_path / "output"
+        directory.write_bytes(b"keep")
+    elif kind == "symlink-file":
+        target = tmp_path / "target.txt"
+        target.write_bytes(b"keep")
+        directory = tmp_path / "output"
+        directory.symlink_to(target)
+    else:
+        directory = tmp_path / "output"
+        directory.symlink_to(tmp_path / "missing")
+    with pytest.raises(NotADirectoryError, match="not a directory") as excinfo:
+        batch_generate(["new"], directory)
+    assert str(directory) in str(excinfo.value)
+    assert f"{directory}{os.sep}qr_1.png" not in str(excinfo.value)
+    if kind == "dangling":
+        assert directory.is_symlink()
+        assert not directory.exists()
+    elif kind == "file":
+        assert directory.read_bytes() == b"keep"
+    else:
+        assert directory.is_symlink()
+        assert (tmp_path / "target.txt").read_bytes() == b"keep"
+    assert list(tmp_path.glob("*.png")) == []
+    assert not list(tmp_path.glob(".qrgen-*"))
+
+
+@pytest.mark.parametrize("kind", ["file", "dangling"])
+def test_generate_parent_entry_is_not_replaced(tmp_path, kind):
+    parent = tmp_path / "parent"
+    if kind == "file":
+        parent.write_bytes(b"keep")
+    else:
+        parent.symlink_to(tmp_path / "missing")
+    with pytest.raises(NotADirectoryError, match="not a directory") as excinfo:
+        generate_qr("data", parent / "out.png")
+    assert str(parent) in str(excinfo.value)
+    assert "out.png" not in str(excinfo.value)
+    if kind == "file":
+        assert parent.read_bytes() == b"keep"
+    else:
+        assert parent.is_symlink()
+        assert not parent.exists()
+    assert not list(tmp_path.glob(".qrgen-*"))
+
+
+def test_bad_batch_directory_does_not_consume_input(tmp_path):
+    seen = []
+
+    def source():
+        seen.append("pulled")
+        yield "data"
+
+    target = tmp_path / "file"
+    target.write_bytes(b"keep")
+    with pytest.raises(NotADirectoryError):
+        batch_generate(source(), target)
+    assert seen == []
+    assert target.read_bytes() == b"keep"
+
+
 def test_customization_and_path_return_unchanged(tmp_path):
     path = tmp_path / "sub" / "image.png"
     result = generate_qr(
