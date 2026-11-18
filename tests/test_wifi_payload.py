@@ -7,7 +7,6 @@ from PIL import Image
 from qrcode_generator import generate_wifi_qr
 from qrcode_generator.cli import main
 
-
 CASES = [
     ("MyWiFi", "password123", "WPA"),
     ("Cafe;Guest", "semi;colon", "WPA"),
